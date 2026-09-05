@@ -33,12 +33,8 @@ test("keeps the pairing QR code inside its compact tile", async ({ page }, testI
 
     const qr = page.getByRole("img", { name: "Pairing QR code" });
     await qr.scrollIntoViewIfNeeded();
-    try {
-      // IntersectionObserver rounds fractional sheet/scroll coordinates.
-      await expect(qr).toBeInViewport({ ratio: 0.999 });
-    } finally {
-      await page.screenshot({ path: testInfo.outputPath("pairing-compact.png") });
-    }
+    // IntersectionObserver rounds fractional sheet/scroll coordinates.
+    await expect(qr).toBeInViewport({ ratio: 0.999 });
     const bounds = await qr.evaluate((element) => {
       const tile = element.parentElement;
       if (!tile) throw new Error("Pairing QR tile is missing");
@@ -54,6 +50,7 @@ test("keeps the pairing QR code inside its compact tile", async ({ page }, testI
     expect(bounds.qr.y).toBeGreaterThanOrEqual(bounds.tile.y);
     expect(bounds.qr.right).toBeLessThanOrEqual(bounds.tile.right);
     expect(bounds.qr.bottom).toBeLessThanOrEqual(bounds.tile.bottom);
+    await page.screenshot({ path: testInfo.outputPath("pairing-compact.png") });
   } finally {
     await daemon.close();
   }
