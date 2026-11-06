@@ -31,6 +31,8 @@ interface Turn {
   usageSteps: Set<number>;
   tools: Map<string, Extract<ProviderTimelineItem, { type: "tool_call" }>>;
   usage: Required<Pick<ProviderUsage, "inputTokens" | "outputTokens" | "cachedInputTokens">>;
+  lastStepIndex: number;
+  completedResponse: boolean;
 }
 type State =
   | { type: "dormant" }
@@ -108,6 +110,8 @@ export class Session {
       usageSteps: new Set(),
       tools: new Map(),
       usage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
+      lastStepIndex: -1,
+      completedResponse: false,
     };
     this.state = { type: "running", driver, turn };
     this.emit({
@@ -273,8 +277,14 @@ export class Session {
         },
       });
     }
-    if (result.status === "ERROR") {
-      const canceled = result.error === "interrupted";
+    const canceled = result.status === "ERROR" && result.error === "interrupted";
+    const recovered =
+      result.status === "ERROR" &&
+      !canceled &&
+      turn.completedResponse &&
+      result.response.trim().length > 0 &&
+      Array.from(turn.tools.values()).every((item) => item.status !== "running");
+    if (result.status === "ERROR" && !recovered) {
       this.finishTools(turn, canceled ? "canceled" : "failed");
       this.retire(driver);
       this.emit({
@@ -303,6 +313,10 @@ export class Session {
       const text = previous + step.text_delta;
       turn.text.set(step.step_index, text);
       if (step.text_delta) this.item({ type: "assistant_message", id, messageId: id, text });
+      if (step.step_index >= turn.lastStepIndex) {
+        turn.lastStepIndex = step.step_index;
+        turn.completedResponse = step.state === "DONE" && text.length > 0;
+      }
       if (step.state === "DONE" && step.usage && !turn.usageSteps.has(step.step_index)) {
         turn.usageSteps.add(step.step_index);
         turn.usage.inputTokens += step.usage.input_tokens;
@@ -316,9 +330,16 @@ export class Session {
         });
       }
     } else if (step.step_type === "tool" || step.step_type === "subagent") {
+      if (step.step_index >= turn.lastStepIndex) {
+        turn.lastStepIndex = step.step_index;
+        turn.completedResponse = false;
+      }
       const item = toolItem(step, id);
       turn.tools.set(id, item);
       this.item(item);
+    } else if (step.step_index >= turn.lastStepIndex) {
+      turn.lastStepIndex = step.step_index;
+      turn.completedResponse = false;
     }
   }
 
