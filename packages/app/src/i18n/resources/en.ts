@@ -2219,6 +2219,7 @@ export const en = {
     labels: {
       session: "Session",
       weekly: "Weekly",
+      weeklyShort: "wk",
       monthly: "Monthly",
       codeReview: "Code review",
       credits: "Credits",

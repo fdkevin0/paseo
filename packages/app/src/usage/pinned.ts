@@ -1,6 +1,11 @@
 import type { TFunction } from "i18next";
 import { i18n } from "@/i18n/i18next";
-import { formatPct, formatDisplayPct, formatProviderUsageLabel } from "./format";
+import {
+  formatPct,
+  formatDisplayPct,
+  formatProviderUsageLabel,
+  formatProviderUsageShortLabel,
+} from "./format";
 import { displayPercent } from "./model";
 import { effectiveUsagePins, type UsagePreferences } from "./preferences";
 import { windowTone } from "./tone";
@@ -87,7 +92,7 @@ export function resolvePinnedUsage(
         return {
           key: `${entry.id}/${window.id}`,
           label: `${describe(entry, formatProviderUsageLabel(window.id, window.label, t))} ${formatDisplayPct(percent, preferences.displayAs, undefined, t)}`,
-          shortLabel: window.shortLabel ?? formatProviderUsageLabel(window.id, window.label, t),
+          shortLabel: formatProviderUsageShortLabel(window, t),
           percent,
           percentText,
           tone: windowTone(window),

@@ -2193,6 +2193,7 @@ export const ar: TranslationResources = {
     labels: {
       session: "الجلسة",
       weekly: "أسبوعي",
+      weeklyShort: "أسبوع",
       monthly: "شهري",
       codeReview: "مراجعة التعليمات البرمجية",
       credits: "الأرصدة",

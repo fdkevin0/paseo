@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import { i18n } from "@/i18n/i18next";
 import { formatTimeOfDay } from "@/utils/time";
 import type { UsageDisplayAs } from "./preferences";
-import type { UsageBalanceUnit } from "./types";
+import type { UsageBalanceUnit, UsageWindow } from "./types";
 
 const providerUsageLabels = {
   session: { label: "Session", key: "providerUsage.labels.session" },
@@ -13,7 +13,81 @@ const providerUsageLabels = {
   monthly_credits: { label: "Monthly credits", key: "providerUsage.labels.monthlyCredits" },
 } as const;
 
+// shortcut: the SDK flattens scope/period into names; replace this boundary when structured metadata is available.
+function reportedUsageLabels(id: string, label: string, t: TFunction) {
+  const scopeEnd = id.lastIndexOf(":");
+  const labelScopeEnd = label.lastIndexOf(" · ");
+  const scoped = scopeEnd > 0 && labelScopeEnd > 0;
+  const periodId = scoped ? id.slice(scopeEnd + 1) : id;
+  const periodLabel = scoped ? label.slice(labelScopeEnd + 3) : label;
+  const scopeLabel = scoped ? label.slice(0, labelScopeEnd) : "";
+  let translatedScope = scopeLabel;
+  if (id.slice(0, scopeEnd) === "code_review" && scopeLabel === "Code review") {
+    translatedScope = t("providerUsage.labels.codeReview");
+  }
+
+  let canonicalLabel: string;
+  let canonicalShortLabel: string;
+  let translatedLabel: string;
+  let translatedShortLabel: string;
+  if (periodId === "weekly") {
+    canonicalLabel = "Weekly";
+    canonicalShortLabel = "wk";
+    translatedLabel = t("providerUsage.labels.weekly");
+    translatedShortLabel = t("providerUsage.labels.weeklyShort");
+  } else {
+    let seconds = 18000;
+    if (periodId !== "five_hour") {
+      seconds = Number(periodId.slice(0, -1));
+      const canonicalId = `${seconds}s`;
+      if (periodId !== canonicalId || seconds === 18000 || seconds === 604800) return null;
+    }
+    if (!Number.isFinite(seconds) || seconds <= 0) return null;
+    const units = [
+      [86400, "day", "d"],
+      [3600, "hour", "h"],
+      [60, "minute", "m"],
+      [1, "second", "s"],
+    ] as const;
+    const [size, unit, shortUnit] =
+      units.find(([unitSeconds]) => seconds % unitSeconds === 0) ?? units[3];
+    const amount = seconds / size;
+    canonicalLabel = `${amount}-${unit}`;
+    canonicalShortLabel = `${amount}${shortUnit}`;
+    translatedLabel = new Intl.NumberFormat(i18n.resolvedLanguage, {
+      style: "unit",
+      unit,
+      unitDisplay: "long",
+      maximumSignificantDigits: 21,
+    }).format(amount);
+    translatedShortLabel = new Intl.NumberFormat(i18n.resolvedLanguage, {
+      style: "unit",
+      unit,
+      unitDisplay: "narrow",
+      maximumSignificantDigits: 21,
+    }).format(amount);
+  }
+  if (periodLabel !== canonicalLabel) return null;
+  if (scoped) {
+    return {
+      label: `${translatedScope} · ${translatedLabel}`,
+      shortLabel: `${translatedScope} ${translatedShortLabel}`,
+      canonicalShortLabel: `${scopeLabel} ${canonicalShortLabel}`,
+    };
+  }
+  return { label: translatedLabel, shortLabel: translatedShortLabel, canonicalShortLabel };
+}
+
+export function formatProviderUsageShortLabel(window: UsageWindow, t: TFunction = i18n.t): string {
+  if (window.shortLabel === undefined) return formatProviderUsageLabel(window.id, window.label, t);
+  const reported = reportedUsageLabels(window.id, window.label, t);
+  if (reported && window.shortLabel === reported.canonicalShortLabel) return reported.shortLabel;
+  return window.shortLabel;
+}
+
 export function formatProviderUsageLabel(id: string, label: string, t: TFunction = i18n.t): string {
+  const reported = reportedUsageLabels(id, label, t);
+  if (reported) return reported.label;
   const reviewPrefix = "Code review · ";
   if (id.startsWith("code_review:") && label.startsWith(reviewPrefix)) {
     const periodId = id.slice("code_review:".length);

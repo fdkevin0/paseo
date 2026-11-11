@@ -2227,6 +2227,7 @@ export const ptBR: TranslationResources = {
     labels: {
       session: "Sessão",
       weekly: "Semanal",
+      weeklyShort: "sem.",
       monthly: "Mensal",
       codeReview: "Revisão de código",
       credits: "Créditos",

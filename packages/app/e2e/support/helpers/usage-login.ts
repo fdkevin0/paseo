@@ -124,14 +124,14 @@ export async function expectCodexReportedWindows(page: Page, shape: "seven-day-o
   await expect(pinRow(page.locator("body"), "Codex", "Weekly")).toBeChecked();
   await expect(page.getByText("Session", { exact: true })).toHaveCount(0);
   if (shape === "Spark") {
-    const fiveHour = pinRow(page.locator("body"), "Codex", "GPT-5.3-Codex-Spark · 5-hour");
+    const fiveHour = pinRow(page.locator("body"), "Codex", "GPT-5.3-Codex-Spark · 5 hours");
     const weekly = pinRow(page.locator("body"), "Codex", "GPT-5.3-Codex-Spark · Weekly");
     await expect(fiveHour).not.toBeChecked();
     await expect(weekly).not.toBeChecked();
     await fiveHour.click();
     await expect(fiveHour).toBeChecked();
     await expect(usageItem(page)).toHaveAccessibleName(
-      /Codex Weekly 11% used, Codex GPT-5.3-Codex-Spark · 5-hour 0% used/,
+      /Codex Weekly 11% used, Codex GPT-5.3-Codex-Spark · 5 hours 0% used/,
     );
   }
 }

@@ -2216,6 +2216,7 @@ export const ja: TranslationResources = {
     labels: {
       session: "セッション",
       weekly: "週間",
+      weeklyShort: "週",
       monthly: "月間",
       codeReview: "コードレビュー",
       credits: "クレジット",

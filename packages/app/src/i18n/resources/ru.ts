@@ -2228,6 +2228,7 @@ export const ru: TranslationResources = {
     labels: {
       session: "Сессия",
       weekly: "Еженедельно",
+      weeklyShort: "нед.",
       monthly: "Ежемесячно",
       codeReview: "Проверка кода",
       credits: "Кредиты",
