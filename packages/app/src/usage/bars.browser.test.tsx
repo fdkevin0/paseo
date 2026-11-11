@@ -80,7 +80,6 @@ vi.mock("./in-sidebar", () => ({
   },
 }));
 // Keep the fixture source icon's real 14px footprint; the repository SVG stub renders null.
-vi.mock("lucide-react-native", async (original) => ({ ...(await original()), Gauge: () => null }));
 vi.mock("react-native-svg", async (original) => ({
   ...(await original()),
   SvgXml: ({ width, height }: { width: number; height: number }) => (
@@ -167,7 +166,8 @@ function expectCompleteSidebar(sources: ReturnType<typeof resolvePinnedUsage>) {
     expected.map((w) => `${w.percentText}${w.shortLabel ? ` ${w.shortLabel}` : ""}`),
   );
   const bounds = trigger.getBoundingClientRect();
-  for (const element of shown) {
+  const named = [...container.querySelectorAll('[data-testid="sidebar-usage-source-label"]')];
+  for (const element of [...shown, ...named]) {
     const box = element.getBoundingClientRect();
     expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
     expect(box.left).toBeGreaterThanOrEqual(bounds.left);
@@ -183,7 +183,6 @@ it("keeps all scoped quota labels at 240px", async () => {
   await page.viewport(800, 600);
   container.style.width = "240px";
   const sources = await renderSidebar(sidebarReports().slice(0, 2));
-  await page.screenshot({ element: container, path: "/tmp/usage-sidebar-identities-240-en.png" });
   expectCompleteSidebar(sources);
   await expect
     .poll(
@@ -234,16 +233,6 @@ it.each(sidebarCases)(
             (e) => e.textContent,
           ),
         ).toEqual(reports.map((r) => `${r.sourceLabel} (${r.account.label})`));
-        if (width === 240 && language === "en" && fontSize === 14 && reports.length === 4)
-          await page.screenshot({
-            element: container,
-            path: "/tmp/usage-sidebar-identities-240-en-accounts.png",
-          });
-        if (width === 220 && language === "zh-CN" && fontSize === 22 && reports.length === 2)
-          await page.screenshot({
-            element: container,
-            path: "/tmp/usage-sidebar-identities-220-zh-large.png",
-          });
       }
     } finally {
       font.remove();
@@ -270,4 +259,16 @@ it("preserves explicit pins across accounts and one keyboard target", async () =
   expect(document.activeElement).toBe(trigger);
   await userEvent.tab();
   expect(container.contains(document.activeElement)).toBe(false);
+});
+
+it("wraps an unbroken account name without clipping its identity", async () => {
+  container.style.width = "220px";
+  const accountName = "ResearchAccountWithoutWordBoundaries".repeat(4) + "@example.test";
+  const sources = await renderSidebar([
+    account("custom", "Future", accountName, [quota("unknown", "Daily allowance", 29)]),
+  ]);
+  expectCompleteSidebar(sources);
+  expect(container.querySelector('[data-testid="sidebar-usage-source-label"]')?.textContent).toBe(
+    `Future (${accountName})`,
+  );
 });
