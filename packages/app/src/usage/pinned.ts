@@ -22,39 +22,34 @@ export interface PinnedUsageWindow {
 /** One account's summary windows, under its source's icon. */
 export interface PinnedUsageSource {
   key: string;
+  label: string;
   icon: string | null;
   windows: PinnedUsageWindow[];
 }
 
-/** How much of each window the one-line summary has room for. */
-export type PinnedUsageLayout = "meters" | "labels" | "percents";
+/** Whether every meter fits beside this account's full window labels. */
+export type PinnedUsageLayout = "meters" | "labels";
 
 // A meter narrower than this is a sliver that reads as noise rather than a share.
 export const MIN_METER_WIDTH = 16;
-/** The space between a meter and its text. */
 export const METER_GAP = 4;
 
-/**
- * The richest layout that fits on one line: every window's meter, else its short label, else its
- * percent alone. Meters are all or none; a line never mixes them. Until the widths are known it
- * shows labels, which never flashes meters that turn out not to fit.
- */
+/** Keep labels until measured, and wrap them when meters do not fit. */
 export function choosePinnedUsageLayout(input: {
   available: number | null;
   labelsWidth: number | null;
-  percentsWidth: number | null;
   windowCount: number;
 }): PinnedUsageLayout {
-  const { available, labelsWidth, percentsWidth, windowCount } = input;
-  if (available === null || labelsWidth === null || percentsWidth === null) return "labels";
+  const { available, labelsWidth, windowCount } = input;
+  if (available === null || labelsWidth === null) return "labels";
   if (labelsWidth + windowCount * (MIN_METER_WIDTH + METER_GAP) <= available) return "meters";
-  if (labelsWidth <= available) return "labels";
-  return percentsWidth < labelsWidth ? "percents" : "labels";
+  return "labels";
 }
 
 function describe(entry: UsageReportEntry, windowLabel: string): string {
   const account = entry.account.label ? ` (${entry.account.label})` : "";
-  return `${entry.sourceLabel}${account} ${windowLabel}`;
+  const source = `${entry.sourceLabel}${account}`;
+  return windowLabel ? `${source} ${windowLabel}` : source;
 }
 
 /** Reports with every account of a source together, sources in the order they first appear. */
@@ -94,6 +89,6 @@ export function resolvePinnedUsage(
         };
       });
     if (windows.length === 0) return [];
-    return [{ key: entry.id, icon: entry.icon ?? null, windows }];
+    return [{ key: entry.id, label: describe(entry, ""), icon: entry.icon ?? null, windows }];
   });
 }

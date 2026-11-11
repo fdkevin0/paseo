@@ -53,15 +53,15 @@ function preferences(
 }
 
 describe("choosePinnedUsageLayout", () => {
-  const widths = { labelsWidth: 200, percentsWidth: 120, windowCount: 2 };
+  const widths = { labelsWidth: 200, windowCount: 2 };
 
   it("shows meters only when every window's meter fits beside the labels", () => {
     expect(choosePinnedUsageLayout({ ...widths, available: 240 })).toBe("meters");
     expect(choosePinnedUsageLayout({ ...widths, available: 239 })).toBe("labels");
   });
 
-  it("drops the labels before it lets the line overflow", () => {
-    expect(choosePinnedUsageLayout({ ...widths, available: 199 })).toBe("percents");
+  it("keeps labels when the account needs to wrap", () => {
+    expect(choosePinnedUsageLayout({ ...widths, available: 199 })).toBe("labels");
   });
 
   it("shows labels until the widths are measured", () => {
@@ -130,6 +130,7 @@ describe("resolvePinnedUsage", () => {
       ]),
     );
 
+    expect(sources.map((source) => source.label)).toEqual(["Claude", "Claude (work)", "Codex"]);
     const windowKeys = (source: PinnedUsageSource) => source.windows.map((window) => window.key);
     expect(sources.map((source) => [source.key, windowKeys(source)])).toEqual([
       ["claude:default", ["claude:default/five-hour", "claude:default/weekly"]],
@@ -138,6 +139,7 @@ describe("resolvePinnedUsage", () => {
     ]);
     expect(sources[0]).toEqual({
       key: "claude:default",
+      label: "Claude",
       icon: "<svg/>",
       windows: [
         {
