@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { windowFromReportedDuration } from "@getpaseo/plugin/server/usage";
 import { i18n } from "@/i18n/i18next";
 import {
   formatDisplayPct,
@@ -6,6 +7,7 @@ import {
   formatAmount,
   formatPct,
   formatProviderUsageLabel,
+  formatProviderUsageShortLabel,
   formatResetLabel,
   formatResetTime,
   formatRunsOutLabel,
@@ -88,10 +90,108 @@ describe("formatAmount", () => {
       "코드 검토 · 주간",
     );
     expect(formatProviderUsageLabel("code_review:five_hour", "Code review · 5-hour")).toBe(
-      "코드 검토 · 5-hour",
+      "코드 검토 · 5시간",
     );
     expect(formatProviderUsageLabel("credits", "Credits")).toBe("크레딧");
     expect(formatProviderUsageLabel("custom_limit", "Custom limit")).toBe("Custom limit");
+  });
+});
+
+describe("scoped quota periods", () => {
+  const durationCases = [
+    [18000, "five_hour", "5小时", "5小时"],
+    [604800, "weekly", "每周", "周"],
+    [86400, "86400s", "1天", "1天"],
+    [7200, "7200s", "2小时", "2小时"],
+    [120, "120s", "2分钟", "2分钟"],
+    [90, "90s", "90秒钟", "90秒"],
+    [0.5, "0.5s", "0.5秒钟", "0.5秒"],
+    [1e-7, "1e-7s", "0.0000001秒钟", "0.0000001秒"],
+  ] as const;
+
+  it.each(durationCases)(
+    "localizes the SDK encoding for %s seconds",
+    async (seconds, periodId, full, short) => {
+      await i18n.changeLanguage("zh-CN");
+      const window = windowFromReportedDuration({
+        durationSeconds: seconds,
+        scope: { id: "limit:model:extra", label: "Model: X · Extra" },
+        unknown: { id: "unknown", label: "Custom quota", shortLabel: "custom" },
+        utilizationPct: 30,
+      });
+      expect(window.id).toBe(`limit:model:extra:${periodId}`);
+      expect(formatProviderUsageLabel(window.id, window.label)).toBe(`Model: X · Extra · ${full}`);
+      expect(formatProviderUsageShortLabel(window)).toBe(`Model: X · Extra ${short}`);
+      expect(formatProviderUsageShortLabel({ ...window, shortLabel: "My short name" })).toBe(
+        "My short name",
+      );
+      expect(formatProviderUsageShortLabel({ ...window, shortLabel: "" })).toBe("");
+    },
+  );
+
+  it("preserves unknown and noncanonical id/label pairs", async () => {
+    await i18n.changeLanguage("zh-CN");
+    const pairs = [
+      ["model:weekly", "Model · My allowance"],
+      ["model:unknown", "Model · Weekly"],
+      ["model:five_hour", "Model · 5-hour limit"],
+      ["model:weekly", "Weekly"],
+      ["model", "Model · Weekly"],
+      ["model:18000s", "Model · 5-hour"],
+      ["model:604800s", "Model · 7-day"],
+      ["model:060s", "Model · 1-minute"],
+      ["model:60s", "Model · 60-second"],
+      ["model:0s", "Model · 0-second"],
+      ["model:Infinitys", "Model · Infinity-second"],
+      ["model:-1s", "Model · -1-second"],
+    ];
+    for (const [id, label] of pairs) {
+      expect(formatProviderUsageLabel(id, label)).toBe(label);
+      expect(formatProviderUsageShortLabel({ id, label, shortLabel: "custom" })).toBe("custom");
+      expect(formatProviderUsageShortLabel({ id, label, shortLabel: "Model wk" })).toBe("Model wk");
+    }
+  });
+
+  it.each([null, 0, -1, NaN, Infinity])(
+    "preserves the SDK fallback for %s",
+    async (durationSeconds) => {
+      await i18n.changeLanguage("zh-CN");
+      const window = windowFromReportedDuration({
+        durationSeconds,
+        scope: { id: "model", label: "Model" },
+        unknown: { id: "unknown", label: "Custom quota", shortLabel: "custom" },
+        utilizationPct: null,
+      });
+      expect(formatProviderUsageLabel(window.id, window.label)).toBe("Model · Custom quota");
+      expect(formatProviderUsageShortLabel(window)).toBe("Model custom");
+    },
+  );
+
+  it("uses English units and preserves the legacy Session alias", async () => {
+    await i18n.changeLanguage("en");
+    expect(formatProviderUsageLabel("model:five_hour", "Model · 5-hour")).toBe("Model · 5 hours");
+    expect(
+      formatProviderUsageShortLabel({
+        id: "model:weekly",
+        label: "Model · Weekly",
+        shortLabel: "Model wk",
+      }),
+    ).toBe("Model wk");
+    expect(formatProviderUsageLabel("five_hour", "Session")).toBe("Session");
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("translates SDK periods while retaining the model scope", async () => {
+    await i18n.changeLanguage("zh-CN");
+    expect(formatProviderUsageLabel("gemini_models:five_hour", "Gemini · 5-hour")).toBe(
+      "Gemini · 5小时",
+    );
+    expect(formatProviderUsageLabel("claude_and_gpt_models:weekly", "Claude / GPT · Weekly")).toBe(
+      "Claude / GPT · 每周",
+    );
   });
 });
 

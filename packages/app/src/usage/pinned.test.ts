@@ -301,3 +301,82 @@ it("localizes pinned labels and meanings while preserving custom window names", 
     await i18n.changeLanguage("en");
   }
 });
+
+it("keeps both scoped quota groups and account pins across language changes", async () => {
+  const { i18n } = await import("@/i18n/i18next");
+  const quotaWindows: UsageWindow[] = [
+    {
+      id: "gemini:five_hour",
+      label: "Gemini · 5-hour",
+      shortLabel: "Gemini 5h",
+      usedPct: 10,
+      summary: true,
+    },
+    {
+      id: "gemini:weekly",
+      label: "Gemini · Weekly",
+      shortLabel: "Gemini wk",
+      usedPct: 20,
+      summary: true,
+    },
+    {
+      id: "claude_gpt:five_hour",
+      label: "Claude / GPT · 5-hour",
+      shortLabel: "Claude / GPT 5h",
+      usedPct: 30,
+      summary: true,
+    },
+    {
+      id: "claude_gpt:weekly",
+      label: "Claude / GPT · Weekly",
+      shortLabel: "Claude / GPT wk",
+      usedPct: 40,
+      summary: true,
+    },
+  ];
+  const entries = ["First", "Second"].map((account) =>
+    report({ sourceId: "test", sourceLabel: "Test", account, windows: quotaWindows }),
+  );
+  const originalEntries = structuredClone(entries);
+  const selected = preferences([{ sourceId: "test", windowId: "claude_gpt:weekly" }]);
+  try {
+    await i18n.changeLanguage("en");
+    const originalKeys = windows(entries, preferences(null)).map((w) => w.key);
+    expect(windows(entries, preferences(null)).map((w) => w.shortLabel)).toEqual([
+      "Gemini 5h",
+      "Gemini wk",
+      "Claude / GPT 5h",
+      "Claude / GPT wk",
+      "Gemini 5h",
+      "Gemini wk",
+      "Claude / GPT 5h",
+      "Claude / GPT wk",
+    ]);
+    await i18n.changeLanguage("zh-CN");
+    const localized = windows(entries, preferences(null));
+    expect(localized.map((w) => w.key)).toEqual(originalKeys);
+    expect(localized.map((w) => w.shortLabel)).toEqual([
+      "Gemini 5小时",
+      "Gemini 周",
+      "Claude / GPT 5小时",
+      "Claude / GPT 周",
+      "Gemini 5小时",
+      "Gemini 周",
+      "Claude / GPT 5小时",
+      "Claude / GPT 周",
+    ]);
+    expect(localized.map((w) => w.percent)).toEqual([10, 20, 30, 40, 10, 20, 30, 40]);
+    expect(windows(entries, selected).map((w) => w.label)).toEqual([
+      "Test (First) Claude / GPT · 每周 已使用 40%",
+      "Test (Second) Claude / GPT · 每周 已使用 40%",
+    ]);
+    expect(windows(entries, { ...selected, displayAs: "remaining" }).map((w) => w.label)).toEqual([
+      "Test (First) Claude / GPT · 每周 剩余 60%",
+      "Test (Second) Claude / GPT · 每周 剩余 60%",
+    ]);
+    expect(selected.pins).toEqual([{ sourceId: "test", windowId: "claude_gpt:weekly" }]);
+    expect(entries).toEqual(originalEntries);
+  } finally {
+    await i18n.changeLanguage("en");
+  }
+});
